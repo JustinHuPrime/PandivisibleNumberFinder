@@ -1,0 +1,4 @@
+bin/
+dependencies/
+finder
+finder-test
