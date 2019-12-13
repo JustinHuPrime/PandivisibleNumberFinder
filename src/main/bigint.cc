@@ -24,32 +24,70 @@
 using namespace std;
 
 namespace pandivisible {
-BigInt::BigInt(int _base, int init) noexcept : base(_base), digits(1, init) {}
-BigInt::operator string() const noexcept {
-  string s = "[" + to_string(digits.front());
-  s += accumulate(digits.cbegin() + 1, digits.cend(), ""s,
-                  [](string const &init, int digit) {
-                    return init + ":" + to_string(digit);
-                  });
-  return s + "]";
-}
-size_t BigInt::size() const noexcept { return digits.size(); }
-BigInt BigInt::extend(int digit) const noexcept {
-  BigInt retval(*this);
-  retval.digits.push_back(digit);
-  return retval;
-}
-std::vector<int>::const_iterator BigInt::cbegin() const noexcept {
-  return digits.cbegin();
-}
-std::vector<int>::const_iterator BigInt::cend() const noexcept {
-  return digits.cend();
+namespace {
+using BigIntConstIterator = BigInt::BigIntConstIterator;
 }
 
-int operator%(BigInt const &number, int modulus) noexcept {
-  int remainder = 0;
-  for (int digit : number.digits)
-    remainder = (digit + number.base * remainder) % modulus;
-  return remainder;
+BigIntConstIterator::BigIntConstIterator(BigInt const *_curr) noexcept
+    : curr(_curr) {}
+bool operator!=(BigIntConstIterator const &a,
+                BigIntConstIterator const &b) noexcept {
+  return a.curr != b.curr;
 }
+bool operator==(BigIntConstIterator const &a,
+                BigIntConstIterator const &b) noexcept {
+  return a.curr == b.curr;
+}
+BigIntConstIterator::reference BigIntConstIterator::operator*() const noexcept {
+  return curr->digit;
+}
+BigIntConstIterator::pointer BigIntConstIterator::operator->() const noexcept {
+  return &curr->digit;
+}
+BigIntConstIterator &BigIntConstIterator::operator++() noexcept {
+  curr = curr->parent();
+  return *this;
+}
+BigIntConstIterator BigIntConstIterator::operator++(int) noexcept {
+  BigIntConstIterator retval = *this;
+  operator++();
+  return retval;
+}
+
+int operator%(BigInt const &i, int modulus) noexcept {
+  return i.moduloBase(modulus).first;
+}
+BigIntConstIterator BigInt::cbegin() const noexcept {
+  return BigIntConstIterator(this);
+}
+BigIntConstIterator BigInt::cend() const noexcept {
+  return BigIntConstIterator(nullptr);
+}
+BigInt::BigInt(int _digit) noexcept : digit(_digit) {}
+
+BigIntRoot::BigIntRoot(int _base, int digit) noexcept
+    : BigInt(digit), base(_base) {}
+BigIntRoot::operator string() const noexcept {
+  return "[" + to_string(digit) + "]";
+}
+size_t BigIntRoot::size() const noexcept { return 1; }
+pair<int, int> BigIntRoot::moduloBase(int modulus) const noexcept {
+  return {digit % modulus, base};
+}
+BigInt const *BigIntRoot::parent() const noexcept { return nullptr; }
+
+BigIntDelta::BigIntDelta(shared_ptr<BigInt> const &_from, int digit) noexcept
+    : BigInt(digit), from(_from) {}
+BigIntDelta::operator string() const noexcept {
+  string s = string(*from);
+  s.insert(s.size() - 1, ":" + to_string(digit));
+  return s;
+}
+size_t BigIntDelta::size() const noexcept { return from->size() + 1; }
+pair<int, int> BigIntDelta::moduloBase(int modulus) const noexcept {
+  auto parent = from->moduloBase(modulus);
+  parent.first = (digit + parent.second * parent.first) % modulus;
+  return parent;
+}
+BigInt const *BigIntDelta::parent() const noexcept { return from.get(); }
 }  // namespace pandivisible

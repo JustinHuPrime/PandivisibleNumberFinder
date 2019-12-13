@@ -139,36 +139,39 @@ int main(int argc, char *argv[]) {
   }
 
   // adding the 1st digit, one is odd
-  for_each(oddDigits.cbegin(), oddDigits.cend(),
-           [&tasks, base](int digit) { tasks.push(BigInt(base, digit)); });
+  for_each(oddDigits.cbegin(), oddDigits.cend(), [&tasks, base](int digit) {
+    tasks.push(make_shared<BigIntRoot>(base, digit));
+  });
 
   for (size_t idx = 0; idx < nthreads; idx++) {
     workers.push_back(thread([&, base ]() noexcept {
       try {
         while (true) {
-          BigInt i = tasks.pop();
+          shared_ptr<BigInt> i = tasks.pop();
           ScopeGuard doneGuard([&tasks]() noexcept { tasks.done(); });
 
-          if (i % static_cast<int>(i.size()) != 0) {
+          if (*i % static_cast<int>(i->size()) != 0) {
             // candidate failed
             continue;
-          } else if (static_cast<int>(i.size()) == base - 1) {
+          } else if (static_cast<int>(i->size()) == base - 1) {
             // long enough - output
             lock_guard synchronize(outputLock);
-            cout << "Found " << string(i) << "\n";
+            cout << "Found " << string(*i) << "\n";
             foundOne = true;
           } else {
             // get usable set - if adding to even length, get odd set, else
             // even set
             vector<int> usableDigits =
-                (i.size() % 2 == 0 ? oddDigits : evenDigits);
-            for_each(i.cbegin(), i.cend(), [&usableDigits](int digit) {
+                (i->size() % 2 == 0 ? oddDigits : evenDigits);
+            for_each(i->cbegin(), i->cend(), [&usableDigits](int digit) {
               auto toRemove =
                   equal_range(usableDigits.begin(), usableDigits.end(), digit);
               usableDigits.erase(toRemove.first, toRemove.second);
             });
             for_each(usableDigits.cbegin(), usableDigits.cend(),
-                     [&tasks, &i](int digit) { tasks.push(i.extend(digit)); });
+                     [&tasks, &i](int digit) {
+                       tasks.push(make_unique<BigIntDelta>(i, digit));
+                     });
           }
         }
       } catch (NoTaskException const &) {

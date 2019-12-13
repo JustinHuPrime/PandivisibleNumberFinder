@@ -24,17 +24,17 @@ char const *NoTaskException::what() const noexcept {
 }
 TaskQueue::TaskQueue() noexcept
     : lock(), newTaskFlag(), tasks(), maybeMoreCount(0) {}
-void TaskQueue::push(BigInt &&task) noexcept {
+void TaskQueue::push(shared_ptr<BigInt> &&task) noexcept {
   lock_guard synchronize(lock);
   tasks.push(move(task));
   newTaskFlag.notify_one();
 }
-void TaskQueue::push(BigInt const &task) noexcept {
+void TaskQueue::push(shared_ptr<BigInt> const &task) noexcept {
   lock_guard synchronize(lock);
   tasks.push(task);
   newTaskFlag.notify_one();
 }
-BigInt TaskQueue::pop() {
+shared_ptr<BigInt> TaskQueue::pop() {
   unique_lock synchronize(lock);
   while (tasks.empty() && maybeMoreCount != 0) {
     // wait until tasks isn't empty or until maybeMoreCount is zero
@@ -45,7 +45,7 @@ BigInt TaskQueue::pop() {
     // no more tasks!
     throw NoTaskException();
   } else {
-    BigInt retval = tasks.front();
+    shared_ptr<BigInt> retval = tasks.front();
     tasks.pop();
     maybeMoreCount++;  // this task might generate more tasks
     return retval;

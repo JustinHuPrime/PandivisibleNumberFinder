@@ -20,41 +20,130 @@
 #define PANDIVISIBLE_BIGINT_H_
 
 #include <cstdint>
+#include <memory>
 #include <string>
-#include <vector>
 
 namespace pandivisible {
-// a big integer with some base
+class BigIntRoot;
+class BigIntDelta;
+
+// a big integer stored as a parent or a delta plus pointer to parent
 // assumes no leading zeroes, may not be empty
 class BigInt {
+  friend class BigIntDelta;
+  friend class BigIntRoot;
+
  public:
-  BigInt(int base, int digit) noexcept;
-  BigInt(BigInt const &) = default;
+  // constant iterator through the digits of a BigInt
+  class BigIntConstIterator {
+   public:
+    using difference_type = ptrdiff_t;
+    using value_type = int;
+    using pointer = int const *;
+    using reference = int const &;
+    using iterator_category = std::input_iterator_tag;
+
+    BigIntConstIterator(BigInt const *) noexcept;
+    BigIntConstIterator(BigIntConstIterator const &) noexcept = default;
+    BigIntConstIterator(BigIntConstIterator &&) noexcept = default;
+
+    ~BigIntConstIterator() noexcept = default;
+
+    BigIntConstIterator &operator=(BigIntConstIterator const &) noexcept =
+        default;
+    BigIntConstIterator &operator=(BigIntConstIterator &&) noexcept = default;
+
+    friend bool operator!=(BigIntConstIterator const &,
+                           BigIntConstIterator const &) noexcept;
+    friend bool operator==(BigIntConstIterator const &,
+                           BigIntConstIterator const &) noexcept;
+    reference operator*() const noexcept;
+    pointer operator->() const noexcept;
+    BigIntConstIterator &operator++() noexcept;
+    BigIntConstIterator operator++(int) noexcept;
+
+   private:
+    BigInt const *curr;
+  };
+
+  BigInt(BigInt const &) noexcept = default;
   BigInt(BigInt &&) noexcept = default;
 
-  ~BigInt() noexcept = default;
+  virtual ~BigInt() noexcept = default;
 
-  BigInt &operator=(BigInt const &) = default;
+  BigInt &operator=(BigInt const &) noexcept = default;
   BigInt &operator=(BigInt &&) noexcept = default;
 
   friend int operator%(BigInt const &, int modulus) noexcept;
 
-  operator std::string() const noexcept;
+  virtual operator std::string() const noexcept = 0;
 
-  size_t size() const noexcept;
+  virtual size_t size() const noexcept = 0;
 
-  // get new number with digit appended to the end
-  BigInt extend(int digit) const noexcept;
+  BigIntConstIterator cbegin() const noexcept;
+  BigIntConstIterator cend() const noexcept;
 
-  std::vector<int>::const_iterator cbegin() const noexcept;
-  std::vector<int>::const_iterator cend() const noexcept;
+ protected:
+  int digit;
 
- private:
-  int const base;
-  std::vector<int> digits;
+  BigInt(int digit) noexcept;
+
+  // returns pair of remainder, base
+  virtual std::pair<int, int> moduloBase(int modulus) const noexcept = 0;
+  // get parent digit, if any
+  virtual BigInt const *parent() const noexcept = 0;
+};
+class BigIntRoot : public BigInt {
+ public:
+  BigIntRoot(int base, int digit) noexcept;
+  BigIntRoot(BigIntRoot const &) noexcept = default;
+  BigIntRoot(BigIntRoot &&) noexcept = default;
+
+  ~BigIntRoot() noexcept = default;
+
+  BigIntRoot &operator=(BigIntRoot const &) noexcept = default;
+  BigIntRoot &operator=(BigIntRoot &&) noexcept = default;
+
+  operator std::string() const noexcept override;
+
+  size_t size() const noexcept override;
+
+ protected:
+  int base;
+
+  std::pair<int, int> moduloBase(int modulus) const noexcept override;
+  BigInt const *parent() const noexcept override;
+};
+class BigIntDelta : public BigInt {
+ public:
+  BigIntDelta(std::shared_ptr<BigInt> const &from, int digit) noexcept;
+  BigIntDelta(BigIntDelta const &) noexcept = default;
+  BigIntDelta(BigIntDelta &&) noexcept = default;
+
+  ~BigIntDelta() noexcept = default;
+
+  BigIntDelta &operator=(BigIntDelta const &) noexcept = default;
+  BigIntDelta &operator=(BigIntDelta &&) noexcept = default;
+
+  operator std::string() const noexcept override;
+
+  size_t size() const noexcept override;
+
+ protected:
+  std::shared_ptr<BigInt> from;
+
+  std::pair<int, int> moduloBase(int modulus) const noexcept override;
+  BigInt const *parent() const noexcept override;
 };
 
+bool operator!=(BigInt::BigIntConstIterator const &,
+                BigInt::BigIntConstIterator const &) noexcept;
+bool operator==(BigInt::BigIntConstIterator const &,
+                BigInt::BigIntConstIterator const &) noexcept;
 int operator%(BigInt const &number, int modulus) noexcept;
+
+std::shared_ptr<BigInt> extend(std::shared_ptr<BigInt> const &parent,
+                               int digit) noexcept;
 }  // namespace pandivisible
 
 #endif  // PANDIVISIBLE_BIGINT_H_

@@ -20,6 +20,7 @@
 #include "bigint.h"
 
 #include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <queue>
 
@@ -53,13 +54,13 @@ class TaskQueue {
   TaskQueue &operator=(TaskQueue &&) = delete;
 
   // add a task
-  void push(BigInt &&) noexcept;
-  void push(BigInt const &) noexcept;
+  void push(std::shared_ptr<BigInt> &&) noexcept;
+  void push(std::shared_ptr<BigInt> const &) noexcept;
 
   // waits for a task, gets it, sets flag for more tasks maybe incoming (from
   // this pop)
   // throws NoTaskException if task queue is empty and no more tasks will come
-  BigInt pop();
+  std::shared_ptr<BigInt> pop();
 
   // marks no more tasks incoming (from this pop)
   void done() noexcept;
@@ -67,7 +68,7 @@ class TaskQueue {
  private:
   std::mutex lock;
   std::condition_variable newTaskFlag;
-  std::queue<BigInt> tasks;
+  std::queue<std::shared_ptr<BigInt>> tasks;
   size_t maybeMoreCount;  // number of threads that may add tasks
 };
 }  // namespace pandivisible
