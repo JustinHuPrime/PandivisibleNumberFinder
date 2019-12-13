@@ -17,10 +17,13 @@
 // This file is part of the Pandivisible Number Finder.
 
 #include "bigint.h"
-#include "queue.h"
+#include "scopeguard.h"
+#include "taskqueue.h"
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <thread>
 
 using namespace std;
@@ -29,7 +32,7 @@ using namespace pandivisible;
 namespace {}
 
 int main(int argc, char *argv[]) {
-  int base;
+  int base = -1;
   size_t nthreads = 1;
 
   for (int idx = 1; idx < argc; idx++) {
@@ -110,6 +113,74 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  cout << "Hello, world!\n";
+  cout << "Searching for pandivisible number of base " << base << " with "
+       << nthreads << " threads\n";
+
+  if (base % 2 != 0) {
+    cout << "None found, trivially!\n";
+    return EXIT_SUCCESS;
+  }
+
+  vector<thread> workers;
+  workers.reserve(nthreads);
+
+  TaskQueue tasks;
+
+  mutex outputLock;
+  bool foundOne = false;
+
+  vector<int> evenDigits;
+  vector<int> oddDigits;
+
+  evenDigits.reserve(static_cast<size_t>(base / 2));
+  oddDigits.reserve(static_cast<size_t>(base / 2));
+  for (int digit = 1; digit < base; digit++) {
+    (digit % 2 == 0 ? evenDigits : oddDigits).push_back(digit);
+  }
+
+  // adding the 1st digit, one is odd
+  for_each(oddDigits.cbegin(), oddDigits.cend(),
+           [&tasks, base](int digit) { tasks.push(BigInt(base, digit)); });
+
+  for (size_t idx = 0; idx < nthreads; idx++) {
+    workers.push_back(thread([&, base ]() noexcept {
+      try {
+        while (true) {
+          BigInt i = tasks.pop();
+          ScopeGuard doneGuard([&tasks]() noexcept { tasks.done(); });
+
+          if (i % static_cast<int>(i.size()) != 0) {
+            // candidate failed
+            continue;
+          } else if (static_cast<int>(i.size()) == base - 1) {
+            // long enough - output
+            lock_guard synchronize(outputLock);
+            cout << "Found " << string(i) << "\n";
+            foundOne = true;
+          } else {
+            // get usable set - if adding to even length, get odd set, else
+            // even set
+            vector<int> usableDigits =
+                (i.size() % 2 == 0 ? oddDigits : evenDigits);
+            for_each(i.cbegin(), i.cend(), [&usableDigits](int digit) {
+              auto toRemove =
+                  equal_range(usableDigits.begin(), usableDigits.end(), digit);
+              usableDigits.erase(toRemove.first, toRemove.second);
+            });
+            for_each(usableDigits.cbegin(), usableDigits.cend(),
+                     [&tasks, &i](int digit) { tasks.push(i.extend(digit)); });
+          }
+        }
+      } catch (NoTaskException const &) {
+        return;  // worker done! no work left
+      }
+    }));
+  }
+
+  for_each(workers.begin(), workers.end(),
+           [](thread &worker) { worker.join(); });
+
+  cout << (foundOne ? "Done!\n" : "None found!\n");
+
   return 0;
 }
