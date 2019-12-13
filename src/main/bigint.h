@@ -20,26 +20,34 @@
 #define PANDIVISIBLE_BIGINT_H_
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace pandivisible {
 // a big integer with some base
-// assumes no leading zeroes
+// assumes no leading zeroes, may not be empty
 class BigInt {
  public:
-  BigInt(int base) noexcept;
   BigInt(int base, int digit) noexcept;
-  BigInt(BigInt const &) noexcept = default;
+  BigInt(BigInt const &) = default;
   BigInt(BigInt &&) noexcept = default;
 
   ~BigInt() noexcept = default;
 
-  BigInt &operator=(BigInt const &) noexcept = default;
+  BigInt &operator=(BigInt const &) = default;
   BigInt &operator=(BigInt &&) noexcept = default;
 
   friend int operator%(BigInt const &, int modulus) noexcept;
 
+  operator std::string() const noexcept;
+
   size_t size() const noexcept;
+
+  // get new number with digit appended to the end
+  BigInt extend(int digit) const noexcept;
+
+  std::vector<int>::const_iterator cbegin() const noexcept;
+  std::vector<int>::const_iterator cend() const noexcept;
 
  private:
   int const base;

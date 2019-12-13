@@ -18,10 +18,33 @@
 
 #include "bigint.h"
 
+#include <algorithm>
+#include <numeric>
+
+using namespace std;
+
 namespace pandivisible {
-BigInt::BigInt(int _base) noexcept : base(_base), digits() {}
 BigInt::BigInt(int _base, int init) noexcept : base(_base), digits(1, init) {}
+BigInt::operator string() const noexcept {
+  string s = "[" + to_string(digits.front());
+  s += accumulate(digits.cbegin() + 1, digits.cend(), ""s,
+                  [](string const &init, int digit) {
+                    return init + ":" + to_string(digit);
+                  });
+  return s + "]";
+}
 size_t BigInt::size() const noexcept { return digits.size(); }
+BigInt BigInt::extend(int digit) const noexcept {
+  BigInt retval(*this);
+  retval.digits.push_back(digit);
+  return retval;
+}
+std::vector<int>::const_iterator BigInt::cbegin() const noexcept {
+  return digits.cbegin();
+}
+std::vector<int>::const_iterator BigInt::cend() const noexcept {
+  return digits.cend();
+}
 
 int operator%(BigInt const &number, int modulus) noexcept {
   int remainder = 0;
